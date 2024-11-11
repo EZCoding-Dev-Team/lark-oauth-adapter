@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/gofiber/fiber/v2/log"
 	"lark-oauth-adapter/dto"
 	"net/http"
 )
@@ -74,6 +75,8 @@ func (s *AuthService) GetAccessToken(data dto.AccessTokenRequest) (*dto.AccessTo
 	if result.Code != 0 {
 		return nil, fmt.Errorf("failed to get user access token: %d", result.Code)
 	}
+
+	log.Debugf("User access token: %s", result.Data.AccessToken)
 
 	return &dto.AccessTokenResponse{
 		AccessToken:      result.Data.AccessToken,
