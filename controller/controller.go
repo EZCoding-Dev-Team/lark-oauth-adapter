@@ -29,8 +29,6 @@ func (c *Controller) RegisterRoutes(app *fiber.App) {
 }
 
 func (c *Controller) accessToken(ctx *fiber.Ctx) error {
-	log.Debugf("Request: %s", ctx.Body())
-	log.Debugf("Query: %v", ctx.Queries())
 	var data dto.AccessTokenRequest
 	if err := ctx.BodyParser(&data); err != nil {
 		log.Error(err)

@@ -1,11 +1,11 @@
 package dto
 
 type AccessTokenRequest struct {
-	GrantType    string `json:"grant_type"`
-	ClientID     string `json:"client_id"`
-	ClientSecret string `json:"client_secret"`
-	Code         string `json:"code"`
-	RedirectURI  string `json:"redirect_uri"`
+	GrantType    string `form:"grant_type"`
+	ClientID     string `form:"client_id"`
+	ClientSecret string `form:"client_secret"`
+	Code         string `form:"code"`
+	RedirectURI  string `form:"redirect_uri"`
 }
 
 type AccessTokenResponse struct {
