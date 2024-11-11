@@ -24,8 +24,8 @@ func NewController() *Controller {
 }
 
 func (c *Controller) RegisterRoutes(app *fiber.App) {
-	app.Post("token", c.accessToken)
-	app.Get("userinfo", c.userInfo)
+	app.Post("/token", c.accessToken)
+	app.Get("/userinfo", c.userInfo)
 }
 
 func (c *Controller) accessToken(ctx *fiber.Ctx) error {

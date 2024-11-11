@@ -72,7 +72,7 @@ func (s *AuthService) GetAccessToken(data dto.AccessTokenRequest) (*dto.AccessTo
 	}
 
 	if result.Code != 0 {
-		return nil, fmt.Errorf("failed to get user access token: %s", result.Msg)
+		return nil, fmt.Errorf("failed to get user access token: %d", result.Code)
 	}
 
 	return &dto.AccessTokenResponse{
