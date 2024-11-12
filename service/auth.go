@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/gofiber/fiber/v2/log"
 	"io"
 	"lark-oauth-adapter/dto"
 	"net/http"
+	"net/url"
 )
 
 type AuthService struct {
 	larkUserAccessTokenURL string
 	larkUserInfoURL        string
+	larkUserContactInfoURL string
 	accessTokenService     *AccessTokenService
 }
 
@@ -20,6 +21,7 @@ func NewAuthService() *AuthService {
 	return &AuthService{
 		larkUserAccessTokenURL: "https://open.feishu.cn/open-apis/authen/v1/oidc/access_token",
 		larkUserInfoURL:        "https://open.feishu.cn/open-apis/authen/v1/user_info",
+		larkUserContactInfoURL: "https://open.feishu.cn/open-apis/contact/v3/users/%s",
 		accessTokenService:     NewAccessTokenService(),
 	}
 }
@@ -79,8 +81,6 @@ func (s *AuthService) GetAccessToken(data dto.AccessTokenRequest) (*dto.AccessTo
 		return nil, fmt.Errorf("failed to get user access token: %d", result.Code)
 	}
 
-	log.Debugf("User access token: %s", result.Data.AccessToken)
-
 	return &dto.AccessTokenResponse{
 		AccessToken:      result.Data.AccessToken,
 		TokenType:        result.Data.TokenType,
@@ -110,20 +110,11 @@ func (s *AuthService) GetUserInfo(authorization string) (*dto.UserInfo, error) {
 		Code int    `json:"code"`
 		Msg  string `json:"msg"`
 		Data struct {
-			Name            string `json:"name"`
-			EnName          string `json:"en_name"`
-			AvatarURL       string `json:"avatar_url"`
-			AvatarThumb     string `json:"avatar_thumb"`
-			AvatarMiddle    string `json:"avatar_middle"`
-			AvatarBig       string `json:"avatar_big"`
 			OpenID          string `json:"open_id"`
 			UnionID         string `json:"union_id"`
-			Email           string `json:"email"`
+			Name            string `json:"name"`
 			EnterpriseEmail string `json:"enterprise_email"`
 			UserID          string `json:"user_id"`
-			Mobile          string `json:"mobile"`
-			TenantKey       string `json:"tenant_key"`
-			EmployeeNo      string `json:"employee_no"`
 		} `json:"data"`
 	}
 	err = json.NewDecoder(resp.Body).Decode(&result)
@@ -135,21 +126,63 @@ func (s *AuthService) GetUserInfo(authorization string) (*dto.UserInfo, error) {
 		return nil, fmt.Errorf("failed to get user info: %s", result.Msg)
 	}
 
+	data, err := s.getUserDepartmentInfo(authorization, result.Data.UnionID)
+	if err != nil {
+		return nil, err
+	}
+
 	return &dto.UserInfo{
 		Sub:               result.Data.UnionID,
 		PreferredUsername: result.Data.UserID,
 		Name:              result.Data.Name,
-		EnName:            result.Data.EnName,
-		AvatarURL:         result.Data.AvatarURL,
-		AvatarThumb:       result.Data.AvatarThumb,
-		AvatarMiddle:      result.Data.AvatarMiddle,
-		AvatarBig:         result.Data.AvatarBig,
-		OpenID:            result.Data.OpenID,
-		UnionID:           result.Data.UnionID,
-		Email:             result.Data.Email,
-		EnterpriseEmail:   result.Data.EnterpriseEmail,
-		UserID:            result.Data.UserID,
-		Mobile:            result.Data.Mobile,
-		EmployeeNo:        result.Data.EmployeeNo,
+		Email:             result.Data.EnterpriseEmail,
+		Groups:            data,
 	}, nil
+}
+
+func (s *AuthService) getUserDepartmentInfo(authorization, unionId string) ([]string, error) {
+	uri, err := url.Parse(fmt.Sprintf(s.larkUserContactInfoURL, unionId))
+	if err != nil {
+		return nil, err
+	}
+	q := uri.Query()
+	q.Set("user_id_type", "union_id")
+	q.Set("department_id_type", "department_id")
+	uri.RawQuery = q.Encode()
+
+	req, err := http.NewRequest("GET", uri.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", authorization)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
+	var result struct {
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+		Data struct {
+			User struct {
+				DepartmentIds []string `json:"department_ids"`
+			} `json:"user"`
+		} `json:"data"`
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		return nil, err
+	}
+
+	if result.Code != 0 {
+		return nil, fmt.Errorf("failed to get user detail info: %s", result.Msg)
+	}
+
+	return result.Data.User.DepartmentIds, nil
 }
